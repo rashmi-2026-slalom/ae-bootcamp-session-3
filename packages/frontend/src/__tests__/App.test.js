@@ -12,8 +12,8 @@ const server = setupServer(
     return res(
       ctx.status(200),
       ctx.json([
-        { id: 1, title: 'Test Task 1', description: 'Desc 1', due_date: '2025-09-30', completed: 0 },
-        { id: 2, title: 'Test Task 2', description: 'Desc 2', due_date: '2025-10-01', completed: 1 },
+        { id: 1, title: 'Test Task 1', description: 'Desc 1', due_date: '2025-09-30', priority: 'P2', completed: 0 },
+        { id: 2, title: 'Test Task 2', description: 'Desc 2', due_date: '2025-10-01', priority: 'P3', completed: 1 },
       ])
     );
   }),
@@ -34,6 +34,7 @@ const server = setupServer(
         title,
         description: req.body.description || '',
         due_date: req.body.due_date || null,
+        priority: req.body.priority || 'P3',
         completed: 0,
       })
     );
@@ -43,7 +44,7 @@ const server = setupServer(
   rest.put('/api/tasks/:id', (req, res, ctx) => {
     return res(
       ctx.status(200),
-      ctx.json({ ...req.body, id: Number(req.params.id), completed: 0 })
+      ctx.json({ ...req.body, priority: req.body.priority || 'P3', id: Number(req.params.id), completed: 0 })
     );
   }),
 
@@ -73,7 +74,7 @@ describe('TODO App', () => {
     });
     expect(screen.getByText('TODO App')).toBeInTheDocument();
     expect(screen.getByTestId('submit-task')).toBeInTheDocument();
-      // Removed 'Tasks' assertion, as the header is 'TODO App'
+    expect(screen.getByLabelText('Priority')).toHaveTextContent('P3');
   });
 
   test('loads and displays tasks', async () => {
@@ -88,8 +89,8 @@ describe('TODO App', () => {
 
   test('adds a new task', async () => {
     let tasks = [
-      { id: 1, title: 'Test Task 1', description: 'Desc 1', due_date: '2025-09-30', completed: 0 },
-      { id: 2, title: 'Test Task 2', description: 'Desc 2', due_date: '2025-10-01', completed: 1 },
+      { id: 1, title: 'Test Task 1', description: 'Desc 1', due_date: '2025-09-30', priority: 'P2', completed: 0 },
+      { id: 2, title: 'Test Task 2', description: 'Desc 2', due_date: '2025-10-01', priority: 'P3', completed: 1 },
     ];
     server.use(
       rest.get('/api/tasks', (req, res, ctx) => {
@@ -102,6 +103,7 @@ describe('TODO App', () => {
           title,
           description: description || '',
           due_date: req.body.due_date || null,
+          priority: req.body.priority || 'P3',
           completed: 0,
         };
         tasks = [...tasks, newTask];
@@ -117,10 +119,27 @@ describe('TODO App', () => {
     });
     await user.type(screen.getByTestId('title-input'), 'New Test Task');
     await user.type(screen.getByTestId('description-input'), 'Task description');
+    await user.click(screen.getByLabelText('Priority'));
+    await user.click(screen.getByRole('option', { name: 'P1' }));
     await user.click(screen.getByTestId('submit-task'));
     await waitFor(() => {
       expect(screen.getByText(/New Test Task/i)).toBeInTheDocument();
+      expect(screen.getByTestId('priority-badge-3')).toHaveTextContent('P1');
     });
+  });
+
+  test('shows only the chosen priority badge for each task', async () => {
+    await act(async () => {
+      render(<App />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Task 1')).toBeInTheDocument();
+      expect(screen.getByTestId('priority-badge-1')).toHaveTextContent('P2');
+      expect(screen.getByTestId('priority-badge-2')).toHaveTextContent('P3');
+    });
+
+    expect(screen.queryByRole('button', { name: /Set Test Task 1 priority to P1/i })).not.toBeInTheDocument();
   });
 
   test('handles API error', async () => {

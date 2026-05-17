@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Paper, Typography, Box } from '@mui/material';
+import { TextField, Button, Paper, Typography, Box, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SaveIcon from '@mui/icons-material/Save';
+
+const PRIORITY_OPTIONS = ['P1', 'P2', 'P3'];
+
+function normalizePriority(priority) {
+  return PRIORITY_OPTIONS.includes(priority) ? priority : 'P3';
+}
 
 function TaskForm({ onSave, initialTask }) {
   const [title, setTitle] = useState(initialTask?.title || '');
   const [description, setDescription] = useState(initialTask?.description || '');
   const [dueDate, setDueDate] = useState(initialTask?.due_date || '');
+  const [priority, setPriority] = useState(normalizePriority(initialTask?.priority));
   const [error, setError] = useState(null);
 
   // Helper to normalize date string to YYYY-MM-DD format
@@ -30,10 +37,12 @@ function TaskForm({ onSave, initialTask }) {
       setTitle(initialTask.title || '');
       setDescription(initialTask.description || '');
       setDueDate(normalizeDateString(initialTask.due_date));
+      setPriority(normalizePriority(initialTask.priority));
     } else {
       setTitle('');
       setDescription('');
       setDueDate('');
+      setPriority('P3');
     }
   }, [initialTask]);
 
@@ -44,10 +53,11 @@ function TaskForm({ onSave, initialTask }) {
       return;
     }
     setError(null);
-    await onSave({ title, description, due_date: dueDate });
+    await onSave({ title, description, due_date: dueDate, priority });
     setTitle('');
     setDescription('');
     setDueDate('');
+    setPriority('P3');
   };
 
   return (
@@ -143,6 +153,34 @@ function TaskForm({ onSave, initialTask }) {
             }
           }}
         />
+        <TextField
+          id="task-priority"
+          label="Priority"
+          select
+          value={priority}
+          onChange={e => setPriority(normalizePriority(e.target.value))}
+          variant="outlined"
+          fullWidth
+          size="small"
+          inputProps={{ 'data-testid': 'priority-select' }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              '&:hover fieldset': {
+                borderColor: '#1976d2',
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: '#1976d2',
+              }
+            }
+          }}
+        >
+          {PRIORITY_OPTIONS.map((priorityOption) => (
+            <MenuItem key={priorityOption} value={priorityOption}>
+              {priorityOption}
+            </MenuItem>
+          ))}
+        </TextField>
         {error && <Typography color="error" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{error}</Typography>}
         <Box display="flex" gap={2}>
           <Button 

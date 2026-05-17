@@ -6,6 +6,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import EventIcon from '@mui/icons-material/Event';
 
+const PRIORITY_OPTIONS = ['P1', 'P2', 'P3'];
+const PRIORITY_COLORS = {
+  P1: '#07F2E6',
+  P2: '#7A7A7A',
+  P3: '#7A7A7A',
+};
+
+function normalizeTaskPriority(priority) {
+  return PRIORITY_OPTIONS.includes(priority) ? priority : 'P3';
+}
+
 function TaskList({ onEdit }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +44,7 @@ function TaskList({ onEdit }) {
       const response = await fetch('/api/tasks');
       if (!response.ok) throw new Error('Failed to fetch tasks');
       const data = await response.json();
-      setTasks(data);
+      setTasks(data.map(task => ({ ...task, priority: normalizeTaskPriority(task.priority) })));
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -123,11 +134,10 @@ function TaskList({ onEdit }) {
             <Typography variant="body2">No tasks found.</Typography>
           </Box>
         )}
-        {tasks.map((task, index) => (
+        {tasks.map((task) => (
           <ListItem 
             key={task.id} 
             sx={{ 
-              pr: 18,
               py: 1,
               mb: 1,
               borderRadius: 2,
@@ -163,6 +173,7 @@ function TaskList({ onEdit }) {
               }}
             />
             <ListItemText
+              sx={{ mr: 2 }}
               primary={
                 <Typography 
                   variant="body2"
@@ -193,16 +204,28 @@ function TaskList({ onEdit }) {
             />
             <Box 
               sx={{ 
-                position: 'absolute', 
-                right: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 1
+                gap: 1,
+                ml: 'auto',
+                flexWrap: 'wrap',
+                justifyContent: 'flex-end'
               }}
             >
+              <Chip
+                label={normalizeTaskPriority(task.priority)}
+                size="small"
+                data-testid={`priority-badge-${task.id}`}
+                sx={{
+                  height: 22,
+                  minWidth: 42,
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  backgroundColor: PRIORITY_COLORS[normalizeTaskPriority(task.priority)],
+                }}
+              />
               {task.due_date && (
                 <Chip
                   icon={<EventIcon sx={{ fontSize: 14 }} />}

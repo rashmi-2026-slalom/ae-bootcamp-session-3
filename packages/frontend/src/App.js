@@ -9,12 +9,23 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSave = async (task) => {
+    const payload = editingTask
+      ? {
+          ...editingTask,
+          ...task,
+          priority: task.priority ?? editingTask.priority ?? 'P3',
+        }
+      : {
+          ...task,
+          priority: task.priority ?? 'P3',
+        };
+
     if (editingTask) {
       // Edit existing task
       await fetch(`/api/tasks/${editingTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task)
+        body: JSON.stringify(payload)
       });
       setEditingTask(null);
     } else {
@@ -22,7 +33,7 @@ function App() {
       await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task)
+        body: JSON.stringify(payload)
       });
     }
     setRefreshKey(k => k + 1);

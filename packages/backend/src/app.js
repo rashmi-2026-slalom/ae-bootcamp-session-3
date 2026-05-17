@@ -3,6 +3,8 @@ const cors = require('cors');
 const morgan = require('morgan');
 const Database = require('better-sqlite3');
 
+const PRIORITY_VALUES = new Set(['P1', 'P2', 'P3']);
+
 // Initialize express app
 const app = express();
 
@@ -22,6 +24,7 @@ Table: tasks
   - title TEXT NOT NULL
   - description TEXT
   - due_date DATE
+  - priority TEXT NOT NULL DEFAULT 'P3'
   - completed BOOLEAN DEFAULT 0
   - created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
@@ -37,6 +40,7 @@ Features:
   - Filtering by completion
   - Search by keyword (title/description)
   - Sort by due date, then creation date
+  - Priority values P1, P2, P3
 */
 
 // Create tasks table
@@ -46,6 +50,7 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT,
     due_date DATE,
+    priority TEXT NOT NULL DEFAULT 'P3' CHECK(priority IN ('P1', 'P2', 'P3')),
     completed BOOLEAN DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
@@ -53,6 +58,18 @@ db.exec(`
 
 
 console.log('In-memory database initialized for TODO tasks');
+
+function getTaskById(id) {
+  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+}
+
+function normalizePriority(priority, fallback = 'P3') {
+  if (priority === undefined || priority === null || priority === '') {
+    return fallback;
+  }
+
+  return PRIORITY_VALUES.has(priority) ? priority : null;
+}
 
 // --- TASK API ENDPOINTS ---
 
@@ -91,13 +108,17 @@ app.get('/api/tasks', (req, res) => {
 // POST /api/tasks (create)
 app.post('/api/tasks', (req, res) => {
   try {
-    const { title, description, due_date } = req.body;
+    const { title, description, due_date, priority } = req.body;
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return res.status(400).json({ error: 'Task title is required' });
     }
-    const stmt = db.prepare('INSERT INTO tasks (title, description, due_date) VALUES (?, ?, ?)');
-    const result = stmt.run(title, description || '', due_date || null);
-    const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+    const normalizedPriority = normalizePriority(priority);
+    if (!normalizedPriority) {
+      return res.status(400).json({ error: 'Priority must be one of P1, P2, or P3' });
+    }
+    const stmt = db.prepare('INSERT INTO tasks (title, description, due_date, priority) VALUES (?, ?, ?, ?)');
+    const result = stmt.run(title, description || '', due_date || null, normalizedPriority);
+    const newTask = getTaskById(result.lastInsertRowid);
     res.status(201).json(newTask);
   } catch (error) {
     console.error('Error creating task:', error);
@@ -108,7 +129,7 @@ app.post('/api/tasks', (req, res) => {
 // GET /api/tasks/:id (detail)
 app.get('/api/tasks/:id', (req, res) => {
   try {
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    const task = getTaskById(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json(task);
   } catch (error) {
@@ -120,14 +141,21 @@ app.get('/api/tasks/:id', (req, res) => {
 // PUT /api/tasks/:id (edit)
 app.put('/api/tasks/:id', (req, res) => {
   try {
-    const { title, description, due_date } = req.body;
+    const { title, description, due_date, priority } = req.body;
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return res.status(400).json({ error: 'Task title is required' });
     }
-    const stmt = db.prepare('UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ?');
-    const result = stmt.run(title, description || '', due_date || null, req.params.id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Task not found' });
-    const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    const existingTask = getTaskById(req.params.id);
+    if (!existingTask) return res.status(404).json({ error: 'Task not found' });
+
+    const normalizedPriority = normalizePriority(priority, existingTask.priority || 'P3');
+    if (!normalizedPriority) {
+      return res.status(400).json({ error: 'Priority must be one of P1, P2, or P3' });
+    }
+
+    const stmt = db.prepare('UPDATE tasks SET title = ?, description = ?, due_date = ?, priority = ? WHERE id = ?');
+    stmt.run(title, description || '', due_date || null, normalizedPriority, req.params.id);
+    const updatedTask = getTaskById(req.params.id);
     res.json(updatedTask);
   } catch (error) {
     console.error('Error updating task:', error);
@@ -145,7 +173,7 @@ app.patch('/api/tasks/:id', (req, res) => {
     const stmt = db.prepare('UPDATE tasks SET completed = ? WHERE id = ?');
     const result = stmt.run(completed ? 1 : 0, req.params.id);
     if (result.changes === 0) return res.status(404).json({ error: 'Task not found' });
-    const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    const updatedTask = getTaskById(req.params.id);
     res.json(updatedTask);
   } catch (error) {
     console.error('Error updating task completion:', error);
