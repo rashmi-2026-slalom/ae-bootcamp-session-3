@@ -8,9 +8,9 @@ import EventIcon from '@mui/icons-material/Event';
 
 const PRIORITY_OPTIONS = ['P1', 'P2', 'P3'];
 const PRIORITY_COLORS = {
-  P1: '#07F2E6',
-  P2: '#7A7A7A',
-  P3: '#7A7A7A',
+  P1: 'var(--priority-selected-color)',
+  P2: 'var(--priority-unselected-color)',
+  P3: 'var(--priority-unselected-color)',
 };
 
 function normalizeTaskPriority(priority) {
